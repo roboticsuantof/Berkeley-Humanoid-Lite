@@ -6,6 +6,9 @@ import numpy as np
 import torch
 import mujoco
 import mujoco.viewer
+import socket
+import json
+import threading
 
 from berkeley_humanoid_lite_lowlevel.policy.config import Cfg
 from berkeley_humanoid_lite_lowlevel.policy.gamepad import Se2Gamepad
@@ -33,11 +36,31 @@ class MujocoEnv:
     def __init__(self, cfg: Cfg):
         self.cfg = cfg
 
-        # Load appropriate MJCF model based on robot configuration
+        # Raíz del repositorio Berkeley-Humanoid-Lite.
+        project_root = Path(__file__).resolve().parents[4]
+
+        mjcf_dir = (
+            project_root
+            / "source"
+            / "berkeley_humanoid_lite_assets"
+            / "data"
+            / "mjcf"
+        )
+
         if cfg.num_joints == 22:
-            self.mj_model = mujoco.MjModel.from_xml_path("source/berkeley_humanoid_lite_assets/data/mjcf/bhl_scene.xml")
+            scene_path = mjcf_dir / "bhl_scene.xml"
         else:
-            self.mj_model = mujoco.MjModel.from_xml_path("source/berkeley_humanoid_lite_assets/data/mjcf/bhl_biped_scene.xml")
+            raise NotImplementedError(
+                "No existe una escena MJCF configurada para "
+                f"{cfg.num_joints} articulaciones."
+            )
+
+        if not scene_path.is_file():
+            raise FileNotFoundError(
+                f"No se encontró el archivo MJCF requerido: {scene_path}"
+            )
+
+        self.mj_model = mujoco.MjModel.from_xml_path(str(scene_path))
 
         self.mj_data = mujoco.MjData(self.mj_model)
         self.mj_model.opt.timestep = self.cfg.physics_dt
@@ -140,6 +163,14 @@ class MujocoSimulator(MujocoEnv):
         self.command_controller = Se2Gamepad()
         self.command_controller.run()
 
+        # Variables recibidas desde ROS 2 por UDP
+        self.ros_arm_cmd = [0.0] * 10
+        self.ros_cmd_vel = [0.0, 0.0, 0.0]
+        self._start_ros_udp_receiver()
+
+        # Variables recibidas desde ROS 2 por UDP
+
+
     def reset(self) -> torch.Tensor:
         """Reset the simulation environment to initial state.
 
@@ -180,6 +211,36 @@ class MujocoSimulator(MujocoEnv):
         self.n_steps += 1
         return observations
 
+    def _start_ros_udp_receiver(self):
+        self.ros_udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.ros_udp_socket.bind(("127.0.0.1", 15000))
+        self.ros_udp_socket.settimeout(0.01)
+
+        self.ros_udp_thread = threading.Thread(
+            target=self._ros_udp_loop,
+            daemon=True
+        )
+        self.ros_udp_thread.start()
+
+        print("ROS2 UDP receiver iniciado en 127.0.0.1:15000")
+
+    def _ros_udp_loop(self):
+        while True:
+            try:
+                data, _ = self.ros_udp_socket.recvfrom(4096)
+                msg = json.loads(data.decode("utf-8"))
+
+                if "arm_cmd" in msg and len(msg["arm_cmd"]) >= 10:
+                    self.ros_arm_cmd = [float(x) for x in msg["arm_cmd"][:10]]
+
+                if "cmd_vel" in msg and len(msg["cmd_vel"]) >= 3:
+                    self.ros_cmd_vel = [float(x) for x in msg["cmd_vel"][:3]]
+
+            except socket.timeout:
+                continue
+            except Exception:
+                continue
+
     def _apply_actions(self, actions: torch.Tensor):
         """Apply control actions to the robot.
 
@@ -188,17 +249,37 @@ class MujocoSimulator(MujocoEnv):
         Args:
             actions (torch.Tensor): Target joint positions for controlled joints
         """
-        target_positions = torch.zeros((self.cfg.num_joints,))
+        target_positions = torch.zeros((self.cfg.num_joints,), dtype=torch.float32)
         target_positions[self.cfg.action_indices] = actions
+
+        # === Brazos controlados desde ROS 2 por UDP ===
+        arm_cmd = torch.tensor(self.ros_arm_cmd, dtype=torch.float32)
+
+        target_positions[0] = arm_cmd[0]
+        target_positions[1] = arm_cmd[1]
+        target_positions[2] = arm_cmd[2]
+        target_positions[3] = arm_cmd[3]
+        target_positions[4] = arm_cmd[4]
+
+        target_positions[5] = arm_cmd[5]
+        target_positions[6] = arm_cmd[6]
+        target_positions[7] = arm_cmd[7]
+        target_positions[8] = arm_cmd[8]
+        target_positions[9] = arm_cmd[9]
 
         # PD control
         output_torques = self.joint_kp * (target_positions - self._get_joint_pos()) + \
             self.joint_kd * (-self._get_joint_vel())
 
         # Apply EMA filtering and torque limits
-        output_torques_clipped = torch.clip(output_torques, -self.effort_limits, self.effort_limits)
+        output_torques_clipped = torch.clip(
+            output_torques,
+            -self.effort_limits,
+            self.effort_limits,
+        )
 
         self.mj_data.ctrl[:] = output_torques_clipped.numpy()
+
 
     def _get_base_pos(self) -> torch.Tensor:
         """Get base position of the robot.

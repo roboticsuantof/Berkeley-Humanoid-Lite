@@ -34,3 +34,9 @@ _isaac_sim*
 _repo
 _build
 .lastformat
+
+# Respaldos locales
+*.bak_*
+
+# Registros de ejecución y errores
+*.log

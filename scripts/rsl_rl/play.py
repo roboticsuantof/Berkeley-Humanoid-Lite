@@ -97,10 +97,10 @@ def main():
     # export policy to onnx/jit
     export_model_dir = os.path.join(os.path.dirname(resume_path), "exported")
     export_policy_as_jit(
-        ppo_runner.alg.policy, ppo_runner.obs_normalizer, path=export_model_dir, filename="policy.pt"
+        ppo_runner.alg.policy, getattr(ppo_runner, "obs_normalizer", None), path=export_model_dir, filename="policy.pt"
     )
     export_policy_as_onnx(
-        ppo_runner.alg.policy, normalizer=ppo_runner.obs_normalizer, path=export_model_dir, filename="policy.onnx"
+        ppo_runner.alg.policy, normalizer=getattr(ppo_runner, "obs_normalizer", None), path=export_model_dir, filename="policy.onnx"
     )
 
     # === export the yaml config for deployment ===
@@ -176,7 +176,13 @@ def main():
     OmegaConf.save(deploy_config, "configs/policy_latest.yaml")
 
     # reset environment
-    obs, _ = env.get_observations()
+    obs_result = env.get_observations()
+    if isinstance(obs_result, tuple):
+        obs = obs_result[0]
+    else:
+        obs = obs_result
+    if isinstance(obs, dict) and "policy" in obs:
+        obs = obs["policy"]
     timestep = 0
     # simulate environment
     while simulation_app.is_running():
@@ -185,7 +191,13 @@ def main():
             # agent stepping
             actions = policy(obs)
             # env stepping
-            obs, _, _, _ = env.step(actions)
+            step_result = env.step(actions)
+            if isinstance(step_result, tuple):
+                obs = step_result[0]
+            else:
+                obs = step_result
+            if isinstance(obs, dict) and "policy" in obs:
+                obs = obs["policy"]
         if args_cli.video:
             timestep += 1
             # Exit the play loop after recording one video
