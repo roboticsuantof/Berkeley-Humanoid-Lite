@@ -1,3 +1,44 @@
+## Nota para colaboradores del proyecto
+
+Este repositorio corresponde al fork institucional utilizado para el desarrollo
+del Trabajo de Título de Rodrigo Carmona y Braulio Rodríguez.
+
+Contiene modificaciones adicionales respecto del repositorio original de
+Hybrid Robotics, entre ellas:
+
+- Integración y pruebas de teleoperación mediante mando.
+- Adaptaciones para la ejecución del robot en MuJoCo.
+- Modelo MJCF y mallas requeridas para la simulación.
+- Configuración de la política utilizada en las pruebas.
+- Política exportada en formato ONNX.
+
+Para continuar trabajando con las modificaciones actuales, se debe clonar
+este repositorio del Laboratorio de Robótica y no directamente el repositorio
+original de Hybrid Robotics.
+
+### Clonación completa
+
+Este proyecto utiliza submódulos. Por ello, se debe clonar mediante:
+
+```bash
+git clone --recurse-submodules \
+https://github.com/roboticsuantof/Berkeley-Humanoid-Lite.git
+
+cd Berkeley-Humanoid-Lite
+```
+
+Si el repositorio ya fue clonado sin los submódulos, ejecutar:
+
+```bash
+git submodule update --init --recursive
+```
+
+### Repositorio original
+
+El desarrollo base pertenece al proyecto Berkeley Humanoid Lite de
+Hybrid Robotics. Este fork conserva la relación con el repositorio original,
+pero incorpora las modificaciones y pruebas realizadas para el Trabajo de Título.
+
 # Berkeley Humanoid Lite
 
 [![Python](https://img.shields.io/badge/python-3.11-blue.svg)](https://docs.python.org/3/whatsnew/3.11.html)
