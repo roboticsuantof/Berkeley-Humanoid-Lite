@@ -6,11 +6,11 @@ del Trabajo de Título de Rodrigo Carmona y Braulio Rodríguez.
 Contiene modificaciones adicionales respecto del repositorio original de
 Hybrid Robotics, entre ellas:
 
-- Integración y pruebas de teleoperación mediante mando.
-- Adaptaciones para la ejecución del robot en MuJoCo.
-- Modelo MJCF y mallas requeridas para la simulación.
-- Configuración de la política utilizada en las pruebas.
-- Política exportada en formato ONNX.
+- Integración y pruebas de teleoperación mediante mando. SMR ¿ a traves de ROS2?
+- Adaptaciones para la ejecución del robot en MuJoCo. SMR ¿Que se refiere adaptaciones? ¿Quien se adapto?
+- Modelo MJCF y mallas requeridas para la simulación. SMR: Todo lo que es simulación deberia describirse solo como SIMULACION en ...
+- Configuración de la política utilizada en las pruebas. SMR: Esto debe ir en otro package
+- Política exportada en formato ONNX. SMR: Esto debe ir en otro package
 
 Para continuar trabajando con las modificaciones actuales, se debe clonar
 este repositorio del Laboratorio de Robótica y no directamente el repositorio
